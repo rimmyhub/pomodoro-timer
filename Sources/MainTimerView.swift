@@ -50,6 +50,7 @@ struct MainTimerView: View {
                     }
                     .buttonStyle(.plain)
                     .help("설정")
+                    .disabled(!viewModel.canEditSettings)
                 }
                 .frame(height: 18)
                 .padding(.bottom, 0)

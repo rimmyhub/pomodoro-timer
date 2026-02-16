@@ -204,13 +204,67 @@ enum StatsRange: String, CaseIterable, Codable, Identifiable {
 
 struct AppSettings: Codable {
     var defaultMinutes: Int
+    var breakMinutes: Int
+    var breakCycleEnabled: Bool
     var theme: AppTheme
     var notificationSound: NotificationSoundOption
     var whiteNoiseEnabled: Bool
     var whiteNoiseTrack: WhiteNoiseTrack
 
+    private enum CodingKeys: String, CodingKey {
+        case defaultMinutes
+        case breakMinutes
+        case breakCycleEnabled
+        case theme
+        case notificationSound
+        case whiteNoiseEnabled
+        case whiteNoiseTrack
+    }
+
+    init(
+        defaultMinutes: Int,
+        breakMinutes: Int,
+        breakCycleEnabled: Bool,
+        theme: AppTheme,
+        notificationSound: NotificationSoundOption,
+        whiteNoiseEnabled: Bool,
+        whiteNoiseTrack: WhiteNoiseTrack
+    ) {
+        self.defaultMinutes = max(1, min(60, defaultMinutes))
+        self.breakMinutes = max(1, min(60, breakMinutes))
+        self.breakCycleEnabled = breakCycleEnabled
+        self.theme = theme
+        self.notificationSound = notificationSound
+        self.whiteNoiseEnabled = whiteNoiseEnabled
+        self.whiteNoiseTrack = whiteNoiseTrack
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.defaultMinutes = max(1, min(60, try container.decodeIfPresent(Int.self, forKey: .defaultMinutes) ?? 25))
+        self.breakMinutes = max(1, min(60, try container.decodeIfPresent(Int.self, forKey: .breakMinutes) ?? 5))
+        self.breakCycleEnabled = try container.decodeIfPresent(Bool.self, forKey: .breakCycleEnabled) ?? true
+        self.theme = try container.decodeIfPresent(AppTheme.self, forKey: .theme) ?? .tomato
+        self.notificationSound = try container.decodeIfPresent(NotificationSoundOption.self, forKey: .notificationSound) ?? .clearBell
+        self.whiteNoiseEnabled = try container.decodeIfPresent(Bool.self, forKey: .whiteNoiseEnabled) ?? false
+        self.whiteNoiseTrack = try container.decodeIfPresent(WhiteNoiseTrack.self, forKey: .whiteNoiseTrack) ?? .rain
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(defaultMinutes, forKey: .defaultMinutes)
+        try container.encode(breakMinutes, forKey: .breakMinutes)
+        try container.encode(breakCycleEnabled, forKey: .breakCycleEnabled)
+        try container.encode(theme, forKey: .theme)
+        try container.encode(notificationSound, forKey: .notificationSound)
+        try container.encode(whiteNoiseEnabled, forKey: .whiteNoiseEnabled)
+        try container.encode(whiteNoiseTrack, forKey: .whiteNoiseTrack)
+    }
+
     static let `default` = AppSettings(
         defaultMinutes: 25,
+        breakMinutes: 5,
+        breakCycleEnabled: true,
         theme: .tomato,
         notificationSound: .clearBell,
         whiteNoiseEnabled: false,

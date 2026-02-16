@@ -87,9 +87,20 @@ struct StatsView: View {
             Chart(data) { item in
                 BarMark(
                     x: .value("구간", item.label),
-                    y: .value("초", item.seconds)
+                    y: .value("집중 시간", item.seconds)
                 )
                 .foregroundStyle(viewModel.settings.theme.color)
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel {
+                        if let seconds = value.as(Double.self) {
+                            Text(formatAxisDuration(seconds: Int(seconds.rounded())))
+                        }
+                    }
+                }
             }
             .frame(height: 220)
         }
@@ -115,5 +126,14 @@ struct StatsView: View {
             Spacer(minLength: 0)
         }
         .font(.body)
+    }
+
+    private func formatAxisDuration(seconds: Int) -> String {
+        let safe = max(0, seconds)
+        if safe >= 3600 {
+            let hours = Double(safe) / 3600.0
+            return String(format: "%.1f시간", hours)
+        }
+        return "\(safe / 60)분"
     }
 }

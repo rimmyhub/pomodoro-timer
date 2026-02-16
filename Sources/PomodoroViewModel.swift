@@ -14,6 +14,7 @@ final class PomodoroViewModel: ObservableObject {
 
     @Published var selectedCategoryID: UUID?
     @Published var showCategoryRequiredAlert: Bool = false
+    @Published private(set) var isLockedUntilReset: Bool = false
 
     @Published var selectedStatsRange: StatsRange = .day
     @Published var selectedStatsCategoryID: UUID?
@@ -29,30 +30,30 @@ final class PomodoroViewModel: ObservableObject {
     private var activeSegments: [FocusSegment] = []
     private var sessionTargetSeconds: Int = 0
     private var didCompleteCurrentSession: Bool = false
-    private static let defaultCategoryName = "공부하기"
+    private var lastWorkCategoryIDBeforeBreak: UUID?
+    private var lastWorkMinutesBeforeBreak: Int?
+    private var sessionStartedWithCategoryID: UUID?
+    private var sessionStartedWithMinutes: Int = 25
+    private static let studyCategoryName = "공부하기"
+    private static let breakCategoryName = "휴식"
 
     init() {
         let loadedSettings = persistence.loadSettings()
         self.settings = loadedSettings
         let persistedCategories = persistence.loadCategories()
-        let loadedCategories = Self.ensureDefaultCategory(in: persistedCategories)
+        let loadedCategories = Self.ensureRequiredCategories(in: persistedCategories)
         if loadedCategories != persistedCategories {
             persistence.saveCategories(loadedCategories)
         }
-        self.categories = loadedCategories.sorted { $0.name < $1.name }
+        self.categories = Self.sortCategories(loadedCategories)
         self.sessions = persistence.loadSessions().sorted { $0.endedAt > $1.endedAt }
 
         let safeMinutes = Self.clampMinutes(loadedSettings.defaultMinutes)
         self.configuredMinutes = safeMinutes
         self.remainingSeconds = safeMinutes * 60
 
-        let loadedSelected = persistence.loadSelectedCategoryID()
-        if let loadedSelected, categories.contains(where: { $0.id == loadedSelected }) {
-            self.selectedCategoryID = loadedSelected
-        } else {
-            self.selectedCategoryID = categories.first(where: { $0.name.caseInsensitiveCompare(Self.defaultCategoryName) == .orderedSame })?.id
-            persistence.saveSelectedCategoryID(self.selectedCategoryID)
-        }
+        self.selectedCategoryID = studyCategoryID ?? categories.first?.id
+        persistence.saveSelectedCategoryID(self.selectedCategoryID)
 
         self.selectedStatsCategoryID = nil
         soundService.updateWhiteNoise(enabled: false, track: settings.whiteNoiseTrack)
@@ -68,6 +69,10 @@ final class PomodoroViewModel: ObservableObject {
             return nil
         }
         return category.name
+    }
+
+    func isFixedCategory(_ category: Category) -> Bool {
+        Self.isFixedCategoryName(category.name)
     }
 
     var timerText: String {
@@ -96,14 +101,26 @@ final class PomodoroViewModel: ObservableObject {
     }
 
     var canEditCategory: Bool {
-        !isSessionActive
+        !isLockedUntilReset
+    }
+
+    var canEditSettings: Bool {
+        !isLockedUntilReset
+    }
+
+    private var studyCategoryID: UUID? {
+        categories.first(where: { $0.name.caseInsensitiveCompare(Self.studyCategoryName) == .orderedSame })?.id
+    }
+
+    private var breakCategoryID: UUID? {
+        categories.first(where: { $0.name.caseInsensitiveCompare(Self.breakCategoryName) == .orderedSame })?.id
     }
 
     var statsCategoryOptions: [StatsCategoryOption] {
         var options: [StatsCategoryOption] = [StatsCategoryOption(id: nil, label: "전체")]
 
         let activeSet = Set(categories.map { $0.id })
-        for category in categories.sorted(by: { $0.name < $1.name }) {
+        for category in categories {
             options.append(StatsCategoryOption(id: category.id, label: category.name))
         }
 
@@ -125,7 +142,11 @@ final class PomodoroViewModel: ObservableObject {
         let safe = Self.clampMinutes(value)
         configuredMinutes = safe
         remainingSeconds = safe * 60
-        settings.defaultMinutes = safe
+        if selectedCategoryID == breakCategoryID {
+            settings.breakMinutes = Self.clampBreakMinutes(safe)
+        } else {
+            settings.defaultMinutes = safe
+        }
         saveSettings()
     }
 
@@ -134,39 +155,41 @@ final class PomodoroViewModel: ObservableObject {
     }
 
     func selectCategory(_ id: UUID) {
-        guard !isSessionActive else { return }
+        guard canEditCategory else { return }
         selectedCategoryID = id
+        syncConfiguredMinutesWithSelectedCategory()
         persistence.saveSelectedCategoryID(selectedCategoryID)
     }
 
     func addCategory(_ name: String) {
-        guard !isSessionActive else { return }
+        guard canEditCategory else { return }
         _ = ensureCategory(named: name)
     }
 
     func updateCategory(id: UUID, newName: String) {
-        guard !isSessionActive else { return }
+        guard canEditCategory else { return }
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         guard let index = categories.firstIndex(where: { $0.id == id }) else { return }
+        guard !Self.isFixedCategoryName(categories[index].name) else { return }
         categories[index].name = trimmed
         categories[index].updatedAt = Date()
-        categories.sort { $0.name < $1.name }
+        categories = Self.sortCategories(categories)
         persistence.saveCategories(categories)
     }
 
     func deleteCategory(id: UUID) {
-        guard !isSessionActive else { return }
+        guard canEditCategory else { return }
+        guard let target = categories.first(where: { $0.id == id }),
+              !Self.isFixedCategoryName(target.name) else { return }
         categories.removeAll { $0.id == id }
-        categories = Self.ensureDefaultCategory(in: categories).sorted { $0.name < $1.name }
+        categories = Self.sortCategories(Self.ensureRequiredCategories(in: categories))
 
-        let defaultCategoryID = categories.first(where: {
-            $0.name.caseInsensitiveCompare(Self.defaultCategoryName) == .orderedSame
-        })?.id
+        let fallbackCategoryID = studyCategoryID ?? categories.first?.id
 
         if selectedCategoryID == id {
-            selectedCategoryID = defaultCategoryID ?? categories.first?.id
+            selectedCategoryID = fallbackCategoryID
         }
         persistence.saveSelectedCategoryID(selectedCategoryID)
         persistence.saveCategories(categories)
@@ -187,6 +210,7 @@ final class PomodoroViewModel: ObservableObject {
         isRunning = false
         isPaused = false
         remainingSeconds = configuredMinutes * 60
+        isLockedUntilReset = false
 
         sessionStartedAt = nil
         runSegmentStartedAt = nil
@@ -194,6 +218,10 @@ final class PomodoroViewModel: ObservableObject {
         activeSegments = []
         sessionTargetSeconds = 0
         didCompleteCurrentSession = false
+        lastWorkCategoryIDBeforeBreak = nil
+        lastWorkMinutesBeforeBreak = nil
+        sessionStartedWithCategoryID = nil
+        sessionStartedWithMinutes = settings.defaultMinutes
         refreshWhiteNoisePlayback()
     }
 
@@ -213,25 +241,36 @@ final class PomodoroViewModel: ObservableObject {
     func applySettingsDraft(
         theme: AppTheme,
         notificationSound: NotificationSoundOption,
+        breakMinutes: Int,
+        breakCycleEnabled: Bool,
         whiteNoiseEnabled: Bool,
         whiteNoiseTrack: WhiteNoiseTrack
     ) {
+        guard canEditSettings else { return }
         settings.theme = theme
         settings.notificationSound = notificationSound
+        settings.breakMinutes = Self.clampBreakMinutes(breakMinutes)
+        settings.breakCycleEnabled = breakCycleEnabled
         settings.whiteNoiseEnabled = whiteNoiseEnabled
         settings.whiteNoiseTrack = whiteNoiseTrack
+
+        if !isSessionActive,
+           selectedCategoryID == breakCategoryID {
+            configuredMinutes = settings.breakMinutes
+            remainingSeconds = configuredMinutes * 60
+        }
 
         saveSettings()
         refreshWhiteNoisePlayback()
     }
 
     func applyCategoryDraft(categories: [Category], selectedCategoryID: UUID?) {
-        guard !isSessionActive else { return }
+        guard canEditCategory else { return }
 
-        self.categories = Self.ensureDefaultCategory(in: categories).sorted { $0.name < $1.name }
+        self.categories = Self.sortCategories(Self.ensureRequiredCategories(in: categories))
 
         let fallbackSelectedID = self.categories.first(where: {
-            $0.name.caseInsensitiveCompare(Self.defaultCategoryName) == .orderedSame
+            $0.name.caseInsensitiveCompare(Self.studyCategoryName) == .orderedSame
         })?.id ?? self.categories.first?.id
 
         if let selectedCategoryID, self.categories.contains(where: { $0.id == selectedCategoryID }) {
@@ -239,6 +278,8 @@ final class PomodoroViewModel: ObservableObject {
         } else {
             self.selectedCategoryID = fallbackSelectedID
         }
+
+        syncConfiguredMinutesWithSelectedCategory()
 
         persistence.saveCategories(self.categories)
         persistence.saveSelectedCategoryID(self.selectedCategoryID)
@@ -270,11 +311,15 @@ final class PomodoroViewModel: ObservableObject {
             return
         }
 
+        isLockedUntilReset = true
+
         if sessionStartedAt == nil {
             sessionStartedAt = Date()
             activeSegments = []
             sessionTargetSeconds = remainingSeconds
             didCompleteCurrentSession = false
+            sessionStartedWithCategoryID = selectedCategoryID
+            sessionStartedWithMinutes = configuredMinutes
         }
 
         runSegmentStartedAt = Date()
@@ -334,7 +379,44 @@ final class PomodoroViewModel: ObservableObject {
         sessions.insert(session, at: 0)
         persistence.saveSessions(sessions)
 
+        let completedCategoryIsBreak = category.name.caseInsensitiveCompare(Self.breakCategoryName) == .orderedSame
+
         soundService.playCompletion(for: settings.notificationSound)
+
+        if completedCategoryIsBreak {
+            let preferredWorkCategoryID: UUID? = {
+                guard let lastWorkCategoryIDBeforeBreak else { return nil }
+                guard lastWorkCategoryIDBeforeBreak != breakCategoryID else { return nil }
+                guard categories.contains(where: { $0.id == lastWorkCategoryIDBeforeBreak }) else { return nil }
+                return lastWorkCategoryIDBeforeBreak
+            }()
+
+            selectedCategoryID = preferredWorkCategoryID ?? (studyCategoryID ?? categories.first?.id)
+            persistence.saveSelectedCategoryID(selectedCategoryID)
+            configuredMinutes = clampedMinutes(
+                for: selectedCategoryID,
+                value: lastWorkMinutesBeforeBreak ?? sessionStartedWithMinutes
+            )
+            lastWorkCategoryIDBeforeBreak = nil
+            lastWorkMinutesBeforeBreak = nil
+        } else if settings.breakCycleEnabled, let breakCategoryID {
+            lastWorkCategoryIDBeforeBreak = sessionStartedWithCategoryID ?? categoryID
+            lastWorkMinutesBeforeBreak = clampedMinutes(
+                for: sessionStartedWithCategoryID ?? categoryID,
+                value: sessionStartedWithMinutes
+            )
+            selectedCategoryID = breakCategoryID
+            persistence.saveSelectedCategoryID(selectedCategoryID)
+            configuredMinutes = settings.breakMinutes
+        } else {
+            // When break cycle is off, restore the pre-start category/time directly.
+            if let startedCategoryID = sessionStartedWithCategoryID,
+               categories.contains(where: { $0.id == startedCategoryID }) {
+                selectedCategoryID = startedCategoryID
+            }
+            persistence.saveSelectedCategoryID(selectedCategoryID)
+            configuredMinutes = clampedMinutes(for: selectedCategoryID, value: sessionStartedWithMinutes)
+        }
 
         remainingSeconds = configuredMinutes * 60
 
@@ -344,6 +426,8 @@ final class PomodoroViewModel: ObservableObject {
         activeSegments = []
         sessionTargetSeconds = 0
         didCompleteCurrentSession = false
+        sessionStartedWithCategoryID = nil
+        sessionStartedWithMinutes = settings.defaultMinutes
     }
 
     private func startTicker() {
@@ -396,7 +480,7 @@ final class PomodoroViewModel: ObservableObject {
         let now = Date()
         let created = Category(id: UUID(), name: name, createdAt: now, updatedAt: now)
         categories.append(created)
-        categories.sort { $0.name < $1.name }
+        categories = Self.sortCategories(categories)
 
         persistence.saveCategories(categories)
         return created.id
@@ -409,6 +493,22 @@ final class PomodoroViewModel: ObservableObject {
     private func refreshWhiteNoisePlayback() {
         let shouldPlay = isRunning && settings.whiteNoiseEnabled
         soundService.updateWhiteNoise(enabled: shouldPlay, track: settings.whiteNoiseTrack)
+    }
+
+    private func syncConfiguredMinutesWithSelectedCategory() {
+        if selectedCategoryID == breakCategoryID {
+            configuredMinutes = Self.clampBreakMinutes(settings.breakMinutes)
+        } else {
+            configuredMinutes = Self.clampMinutes(settings.defaultMinutes)
+        }
+        remainingSeconds = configuredMinutes * 60
+    }
+
+    private func clampedMinutes(for categoryID: UUID?, value: Int) -> Int {
+        if categoryID == breakCategoryID {
+            return Self.clampBreakMinutes(value)
+        }
+        return Self.clampMinutes(value)
     }
 
     private func filteredSessionsForRange() -> [FocusSession] {
@@ -569,21 +669,56 @@ final class PomodoroViewModel: ObservableObject {
         max(1, min(60, value))
     }
 
-    private static func ensureDefaultCategory(in categories: [Category]) -> [Category] {
-        if categories.contains(where: { $0.name.caseInsensitiveCompare(defaultCategoryName) == .orderedSame }) {
-            return categories
+    private static func clampBreakMinutes(_ value: Int) -> Int {
+        max(1, min(60, value))
+    }
+
+    private static func isFixedCategoryName(_ name: String) -> Bool {
+        name.caseInsensitiveCompare(studyCategoryName) == .orderedSame
+            || name.caseInsensitiveCompare(breakCategoryName) == .orderedSame
+    }
+
+    private static func categoryPriority(_ name: String) -> Int {
+        if name.caseInsensitiveCompare(breakCategoryName) == .orderedSame { return 0 }
+        if name.caseInsensitiveCompare(studyCategoryName) == .orderedSame { return 1 }
+        return 2
+    }
+
+    private static func sortCategories(_ categories: [Category]) -> [Category] {
+        categories.sorted { lhs, rhs in
+            let lp = categoryPriority(lhs.name)
+            let rp = categoryPriority(rhs.name)
+            if lp != rp { return lp < rp }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private static func ensureRequiredCategories(in categories: [Category]) -> [Category] {
+        var result = categories
+        let now = Date()
+
+        if !result.contains(where: { $0.name.caseInsensitiveCompare(studyCategoryName) == .orderedSame }) {
+            result.append(
+                Category(
+                    id: UUID(),
+                    name: studyCategoryName,
+                    createdAt: now,
+                    updatedAt: now
+                )
+            )
         }
 
-        let now = Date()
-        var result = categories
-        result.append(
-            Category(
-                id: UUID(),
-                name: defaultCategoryName,
-                createdAt: now,
-                updatedAt: now
+        if !result.contains(where: { $0.name.caseInsensitiveCompare(breakCategoryName) == .orderedSame }) {
+            result.append(
+                Category(
+                    id: UUID(),
+                    name: breakCategoryName,
+                    createdAt: now,
+                    updatedAt: now
+                )
             )
-        )
+        }
+
         return result
     }
 }

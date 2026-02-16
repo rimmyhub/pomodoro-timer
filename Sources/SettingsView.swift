@@ -7,6 +7,8 @@ struct SettingsView: View {
 
     @State private var draftTheme: AppTheme
     @State private var draftNotificationSound: NotificationSoundOption
+    @State private var draftBreakMinutes: Int
+    @State private var draftBreakCycleEnabled: Bool
     @State private var draftWhiteNoiseEnabled: Bool
     @State private var draftWhiteNoiseTrack: WhiteNoiseTrack
     @State private var isHydratingDrafts: Bool = false
@@ -16,6 +18,8 @@ struct SettingsView: View {
         self.onClose = onClose
         _draftTheme = State(initialValue: viewModel.settings.theme)
         _draftNotificationSound = State(initialValue: viewModel.settings.notificationSound)
+        _draftBreakMinutes = State(initialValue: viewModel.settings.breakMinutes)
+        _draftBreakCycleEnabled = State(initialValue: viewModel.settings.breakCycleEnabled)
         _draftWhiteNoiseEnabled = State(initialValue: viewModel.settings.whiteNoiseEnabled)
         _draftWhiteNoiseTrack = State(initialValue: viewModel.settings.whiteNoiseTrack)
     }
@@ -27,8 +31,9 @@ struct SettingsView: View {
                     Text("설정")
                         .font(.title2.bold())
 
-                    themeSection
+                    breakSection
                     soundSection
+                    themeSection
                 }
                 .padding(20)
             }
@@ -46,12 +51,15 @@ struct SettingsView: View {
                     viewModel.applySettingsDraft(
                         theme: draftTheme,
                         notificationSound: draftNotificationSound,
+                        breakMinutes: draftBreakMinutes,
+                        breakCycleEnabled: draftBreakCycleEnabled,
                         whiteNoiseEnabled: draftWhiteNoiseEnabled,
                         whiteNoiseTrack: draftWhiteNoiseTrack
                     )
                     closeView()
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!viewModel.canEditSettings)
             }
             .padding(14)
         }
@@ -75,6 +83,12 @@ struct SettingsView: View {
             guard !isHydratingDrafts else { return }
             guard draftWhiteNoiseEnabled else { return }
             viewModel.previewBGM(next)
+        }
+        .onChange(of: draftBreakMinutes) { next in
+            let clamped = max(1, min(60, next))
+            if clamped != next {
+                draftBreakMinutes = clamped
+            }
         }
     }
 
@@ -106,6 +120,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .disabled(!viewModel.canEditSettings)
     }
 
     private var soundSection: some View {
@@ -148,6 +163,37 @@ struct SettingsView: View {
                 .labelsHidden()
             }
         }
+        .disabled(!viewModel.canEditSettings)
+    }
+
+    private var breakSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("휴식 시간")
+                .font(.headline)
+
+            Toggle("휴식 시간 주기", isOn: $draftBreakCycleEnabled)
+                .toggleStyle(.switch)
+
+            Text("켜져 있으면 업무가 끝난 뒤 휴식 카테고리로 전환됩니다.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                Text("분")
+                    .font(.body)
+                    .frame(width: 48, alignment: .leading)
+
+                TextField("", value: $draftBreakMinutes, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 90)
+
+                Text("(1~60)")
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+            }
+        }
+        .disabled(!viewModel.canEditSettings)
     }
 
     private func soundRow<Content: View>(title: String, @ViewBuilder control: () -> Content) -> some View {
@@ -178,6 +224,8 @@ struct SettingsView: View {
         let current = viewModel.settings
         draftTheme = current.theme
         draftNotificationSound = current.notificationSound
+        draftBreakMinutes = current.breakMinutes
+        draftBreakCycleEnabled = current.breakCycleEnabled
         draftWhiteNoiseEnabled = current.whiteNoiseEnabled
         draftWhiteNoiseTrack = current.whiteNoiseTrack
         viewModel.stopBGMPreview()

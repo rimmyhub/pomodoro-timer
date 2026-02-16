@@ -21,7 +21,7 @@ struct CategoryManagerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("카테고리 관리")
+            Text("카테고리")
                 .font(.title2.bold())
 
             HStack(spacing: 8) {
@@ -52,28 +52,33 @@ struct CategoryManagerView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
+                            if !isFixedCategory(category) {
+                                Button {
+                                    editingCategoryID = category.id
+                                    editingText = category.name
+                                } label: {
+                                    Image(systemName: "pencil")
+                                }
+                                .buttonStyle(.borderless)
+
+                                Button(role: .destructive) {
+                                    draftCategories.removeAll { $0.id == category.id }
+                                    if draftSelectedCategoryID == category.id {
+                                        draftSelectedCategoryID = nil
+                                    }
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                            } else {
+                                Text("고정")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
                             Button("선택") {
                                 draftSelectedCategoryID = category.id
                             }
                             .buttonStyle(.bordered)
-
-                            Button {
-                                editingCategoryID = category.id
-                                editingText = category.name
-                            } label: {
-                                Image(systemName: "pencil")
-                            }
-                            .buttonStyle(.borderless)
-
-                            Button(role: .destructive) {
-                                draftCategories.removeAll { $0.id == category.id }
-                                if draftSelectedCategoryID == category.id {
-                                    draftSelectedCategoryID = nil
-                                }
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
                         }
                     }
                     .disabled(!viewModel.canEditCategory)
@@ -124,7 +129,7 @@ struct CategoryManagerView: View {
         let now = Date()
         let category = Category(id: UUID(), name: trimmed, createdAt: now, updatedAt: now)
         draftCategories.append(category)
-        draftCategories.sort { $0.name < $1.name }
+        draftCategories = sortDraftCategories(draftCategories)
         draftSelectedCategoryID = category.id
         newCategoryName = ""
     }
@@ -140,17 +145,36 @@ struct CategoryManagerView: View {
         guard let index = draftCategories.firstIndex(where: { $0.id == id }) else { return }
         draftCategories[index].name = trimmed
         draftCategories[index].updatedAt = Date()
-        draftCategories.sort { $0.name < $1.name }
+        draftCategories = sortDraftCategories(draftCategories)
 
         editingCategoryID = nil
         editingText = ""
     }
 
     private func syncDraftFromViewModel() {
-        draftCategories = viewModel.categories.sorted { $0.name < $1.name }
+        draftCategories = sortDraftCategories(viewModel.categories)
         draftSelectedCategoryID = viewModel.selectedCategoryID
         newCategoryName = ""
         editingCategoryID = nil
         editingText = ""
+    }
+
+    private func isFixedCategory(_ category: Category) -> Bool {
+        viewModel.isFixedCategory(category)
+    }
+
+    private func sortDraftCategories(_ categories: [Category]) -> [Category] {
+        categories.sorted { lhs, rhs in
+            let lp = categoryPriority(lhs.name)
+            let rp = categoryPriority(rhs.name)
+            if lp != rp { return lp < rp }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func categoryPriority(_ name: String) -> Int {
+        if name.caseInsensitiveCompare("휴식") == .orderedSame { return 0 }
+        if name.caseInsensitiveCompare("공부하기") == .orderedSame { return 1 }
+        return 2
     }
 }
