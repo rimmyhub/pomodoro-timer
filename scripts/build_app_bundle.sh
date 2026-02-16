@@ -1,0 +1,71 @@
+#!/bin/zsh
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+APP_NAME="PomodoroBuddy"
+APP_DIR="$ROOT_DIR/.app/$APP_NAME.app"
+CONTENTS_DIR="$APP_DIR/Contents"
+MACOS_DIR="$CONTENTS_DIR/MacOS"
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
+
+cd "$ROOT_DIR"
+
+echo "Building $APP_NAME..."
+swift build --product "$APP_NAME" >/dev/null
+BIN_DIR="$(swift build --show-bin-path)"
+EXECUTABLE="$BIN_DIR/$APP_NAME"
+
+if [[ ! -f "$EXECUTABLE" ]]; then
+  echo "Build output not found: $EXECUTABLE" >&2
+  exit 1
+fi
+
+rm -rf "$APP_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
+
+cp "$EXECUTABLE" "$MACOS_DIR/$APP_NAME"
+chmod +x "$MACOS_DIR/$APP_NAME"
+
+# Copy SwiftPM resource bundles (for custom sounds loaded via Bundle.module).
+for bundle in "$BIN_DIR"/"${APP_NAME}"_*.bundle "$BIN_DIR"/"${APP_NAME}".bundle; do
+  if [[ -d "$bundle" ]]; then
+    cp -R "$bundle" "$RESOURCES_DIR/"
+  fi
+done
+
+cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>PomodoroBuddy</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.hyerim.pomodorobuddy</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>PomodoroBuddy</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>13.0</string>
+  <key>LSUIElement</key>
+  <true/>
+</dict>
+</plist>
+PLIST
+
+codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
+
+echo "App bundle created:"
+echo "$APP_DIR"
+echo ""
+echo "Run with:"
+echo "open \"$APP_DIR\""
