@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @ObservedObject var viewModel: PomodoroViewModel
@@ -41,6 +42,11 @@ struct SettingsView: View {
             Divider()
 
             HStack {
+                Button("앱 종료") {
+                    terminateApp()
+                }
+                .buttonStyle(.bordered)
+
                 Spacer()
                 Button("닫기") {
                     closeView()
@@ -217,6 +223,11 @@ struct SettingsView: View {
         } else {
             dismiss()
         }
+    }
+
+    private func terminateApp() {
+        viewModel.stopBGMPreview()
+        NSApplication.shared.terminate(nil)
     }
 
     private func syncDraftFromSettings() {
