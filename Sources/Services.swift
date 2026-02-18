@@ -67,6 +67,7 @@ final class SoundService {
     private var whiteNoisePreviewStopWorkItem: DispatchWorkItem?
     private var lastCompletionPlayedAt: Date = .distantPast
     private let supportedAudioExtensions = ["wav", "m4a", "mp3", "aiff"]
+    private lazy var candidateBundles: [Bundle] = resolveCandidateBundles()
 
     func playCompletion(for option: NotificationSoundOption) {
         // Guard against accidental duplicate triggers in a short interval.
@@ -132,15 +133,64 @@ final class SoundService {
 
     private func audioURL(fileBaseName: String) -> URL? {
         for ext in supportedAudioExtensions {
-            if let url = Bundle.module.url(forResource: fileBaseName, withExtension: ext, subdirectory: "Sounds") {
-                return url
-            }
-            // SwiftPM resource processing may place files at the bundle root.
-            if let url = Bundle.module.url(forResource: fileBaseName, withExtension: ext) {
-                return url
+            for bundle in candidateBundles {
+                if let url = bundle.url(forResource: fileBaseName, withExtension: ext, subdirectory: "Sounds") {
+                    return url
+                }
+                // SwiftPM resource processing may place files at the bundle root.
+                if let url = bundle.url(forResource: fileBaseName, withExtension: ext) {
+                    return url
+                }
             }
         }
         return nil
+    }
+
+    private func resolveCandidateBundles() -> [Bundle] {
+        var results: [Bundle] = []
+        var seenBundlePaths = Set<String>()
+
+        func appendBundle(_ bundle: Bundle?) {
+            guard let bundle else { return }
+            let path = bundle.bundlePath
+            guard !path.isEmpty else { return }
+            guard seenBundlePaths.insert(path).inserted else { return }
+            results.append(bundle)
+        }
+
+        // App bundle resources first.
+        appendBundle(.main)
+
+        if let resourceURL = Bundle.main.resourceURL {
+            appendBundle(Bundle(url: resourceURL))
+
+            if let bundleURLs = try? FileManager.default.contentsOfDirectory(
+                at: resourceURL,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) {
+                for url in bundleURLs where url.pathExtension == "bundle" {
+                    appendBundle(Bundle(url: url))
+                }
+            }
+        }
+
+        // SwiftPM `swift run` often places the generated resource bundle next to the executable.
+        if let executablePath = CommandLine.arguments.first {
+            let executableURL = URL(fileURLWithPath: executablePath)
+            let executableDirectory = executableURL.deletingLastPathComponent()
+            if let bundleURLs = try? FileManager.default.contentsOfDirectory(
+                at: executableDirectory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) {
+                for url in bundleURLs where url.pathExtension == "bundle" {
+                    appendBundle(Bundle(url: url))
+                }
+            }
+        }
+
+        return results
     }
 
     private func completionSound(for option: NotificationSoundOption) -> NSSound? {
