@@ -76,18 +76,18 @@ swift run PomodoroBuddy
 ### 앱 번들로 실행
 ```bash
 cd /Users/hyerim/dev/pomodoro-timer
-./scripts/run_app_bundle.sh 1.0.2 2
+./scripts/run_app_bundle.sh 1.0.3 3
 ```
 
 ## 릴리즈 빌드
 ```bash
 cd /Users/hyerim/dev/pomodoro-timer
-./scripts/build_release_zip.sh 1.0.2 2
+./scripts/build_release_zip.sh 1.0.3 3
 ```
 
 생성 결과:
 - `.app`: `/Users/hyerim/dev/pomodoro-timer/.app/PomodoroBuddy.app`
-- zip: `/Users/hyerim/dev/pomodoro-timer/PomodoroBuddy-macOS-v1.0.2.zip`
+- zip: `/Users/hyerim/dev/pomodoro-timer/PomodoroBuddy-macOS-v1.0.3.zip`
 
 ## 문서
 - 제품 요구사항: `PRD.md`

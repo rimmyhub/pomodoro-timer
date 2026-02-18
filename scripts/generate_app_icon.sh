@@ -19,21 +19,21 @@ output_path = sys.argv[1]
 w = 1024
 h = 1024
 
-TOMATO = (227, 61, 51, 255)
-WHITE = (255, 255, 255, 255)
+CANVAS_BG = (255, 255, 255, 255)
+PIE_DARK = (227, 61, 51, 255)
+PIE_LIGHT = (255, 255, 255, 255)
 TRANSPARENT = (0, 0, 0, 0)
 
 left = 72
 top = 72
 right = 952
 bottom = 952
-corner_r = 196
+corner_r = 204
 
 cx = 512.0
 cy = 512.0
-ring_outer = 292.0
-ring_inner = 246.0
-pivot_r = 34.0
+pie_outer_r = 292.0
+sector_degrees = 305.0
 
 def in_rounded_rect(px, py):
     # Center rectangle strips.
@@ -54,26 +54,6 @@ def in_rounded_rect(px, py):
             return True
     return False
 
-def dist_to_segment(px, py, x1, y1, x2, y2):
-    vx = x2 - x1
-    vy = y2 - y1
-    wx = px - x1
-    wy = py - y1
-    c1 = vx * wx + vy * wy
-    if c1 <= 0:
-        return math.hypot(px - x1, py - y1)
-    c2 = vx * vx + vy * vy
-    if c2 <= c1:
-        return math.hypot(px - x2, py - y2)
-    b = c1 / c2
-    bx = x1 + b * vx
-    by = y1 + b * vy
-    return math.hypot(px - bx, py - by)
-
-short_x2, short_y2 = cx + 108.0, cy - 92.0
-long_x2, long_y2 = cx, cy + 158.0
-hand_width = 42.0
-
 rows = bytearray()
 for y in range(h):
     rows.append(0)  # PNG filter type: None
@@ -85,18 +65,16 @@ for y in range(h):
             rows.extend(TRANSPARENT)
             continue
 
-        color = TOMATO
+        color = CANVAS_BG
         d = math.hypot(px - cx, py - cy)
+        clockwise_degrees = math.degrees(math.atan2(px - cx, -(py - cy)))
+        if clockwise_degrees < 0:
+            clockwise_degrees += 360
 
-        if ring_inner <= d <= ring_outer:
-            color = WHITE
-
-        if dist_to_segment(px, py, cx, cy, long_x2, long_y2) <= hand_width / 2:
-            color = WHITE
-        if dist_to_segment(px, py, cx, cy, short_x2, short_y2) <= hand_width / 2:
-            color = WHITE
-        if d <= pivot_r:
-            color = WHITE
+        if d <= pie_outer_r:
+            color = PIE_LIGHT
+            if clockwise_degrees <= sector_degrees:
+                color = PIE_DARK
 
         rows.extend(color)
 
