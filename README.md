@@ -69,25 +69,32 @@ PomodoroBuddy는 메뉴바 앱이라 실행 직후 큰 메인 창이 자동으�
 
 ### 빌드/실행
 ```bash
-cd /Users/hyerim/dev/pomodoro-timer
+git clone https://github.com/rimmyhub/pomodoro-timer.git
+cd pomodoro-timer
 swift run PomodoroBuddy
 ```
 
 ### 앱 번들로 실행
 ```bash
-cd /Users/hyerim/dev/pomodoro-timer
-./scripts/run_app_bundle.sh 1.0.3 3
+./scripts/run_app_bundle.sh
+```
+필요하면 버전/빌드 번호를 직접 지정할 수 있습니다.
+```bash
+./scripts/run_app_bundle.sh <version> <build>
 ```
 
 ## 릴리즈 빌드
 ```bash
-cd /Users/hyerim/dev/pomodoro-timer
-./scripts/build_release_zip.sh 1.0.3 3
+./scripts/build_release_zip.sh
+```
+필요하면 버전/빌드 번호를 직접 지정할 수 있습니다.
+```bash
+./scripts/build_release_zip.sh <version> <build>
 ```
 
 생성 결과:
-- `.app`: `/Users/hyerim/dev/pomodoro-timer/.app/PomodoroBuddy.app`
-- zip: `/Users/hyerim/dev/pomodoro-timer/PomodoroBuddy-macOS-v1.0.3.zip`
+- `.app`: `.app/PomodoroBuddy.app`
+- zip: `PomodoroBuddy-macOS-v<version>.zip`
 
 ## 문서
 - 제품 요구사항: `PRD.md`
