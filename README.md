@@ -36,6 +36,7 @@ GitHub Releases에서 `PomodoroBuddy-macOS-v*.zip` 파일을 받습니다.
 3. 앱을 실행합니다.
 
 처음 실행 시 macOS 보안 경고가 나오면, 시스템 설정에서 실행 허용 후 다시 실행하세요.
+PomodoroBuddy는 메뉴바 앱이라 실행 직후 큰 메인 창이 자동으로 뜨지 않을 수 있습니다. 이 경우 메뉴바 아이콘을 클릭해 타이머 창을 열어 사용하면 됩니다.
 
 ## 사용 방법
 ### 1) 집중 시작
@@ -92,4 +93,3 @@ cd /Users/hyerim/dev/pomodoro-timer
 - 제품 요구사항: `PRD.md`
 - 구현/운영 계획: `IMPLEMENTATION_PLAN.md`
 - 릴리즈 노트 인덱스: `RELEASE_NOTES.md`
-

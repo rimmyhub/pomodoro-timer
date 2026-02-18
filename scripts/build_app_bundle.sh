@@ -6,6 +6,7 @@ APP_NAME="PomodoroBuddy"
 VERSION="${1:-1.0.2}"
 BUILD_NUMBER="${2:-2}"
 CONFIGURATION="${CONFIGURATION:-release}"
+ICON_FILE="$ROOT_DIR/Assets/AppIcon.icns"
 APP_DIR="$ROOT_DIR/.app/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -37,12 +38,16 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$EXECUTABLE" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
 
-# Copy SwiftPM resource bundles (for custom sounds loaded via Bundle.module).
+# Copy SwiftPM resource bundles (for custom sounds).
 for bundle in "$BIN_DIR"/"${APP_NAME}"_*.bundle "$BIN_DIR"/"${APP_NAME}".bundle; do
   if [[ -d "$bundle" ]]; then
     cp -R "$bundle" "$RESOURCES_DIR/"
   fi
 done
+
+if [[ -f "$ICON_FILE" ]]; then
+  cp "$ICON_FILE" "$RESOURCES_DIR/AppIcon.icns"
+fi
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -57,6 +62,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>com.hyerim.pomodorobuddy</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleName</key>
   <string>PomodoroBuddy</string>
   <key>CFBundlePackageType</key>

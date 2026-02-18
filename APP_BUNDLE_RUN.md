@@ -5,17 +5,19 @@
 ## 1) 번들 생성
 
 ```bash
-/Users/hyerim/Documents/dev/pomodoro-technique/scripts/build_app_bundle.sh
+cd /Users/hyerim/dev/pomodoro-timer
+./scripts/build_app_bundle.sh 1.0.2 2
 ```
 
 ## 2) 생성된 앱 실행
 
 ```bash
-open /Users/hyerim/Documents/dev/pomodoro-technique/.app/PomodoroBuddy.app
+open /Users/hyerim/dev/pomodoro-timer/.app/PomodoroBuddy.app
 ```
 
 또는 한 번에 실행:
 
 ```bash
-/Users/hyerim/Documents/dev/pomodoro-technique/scripts/run_app_bundle.sh
+cd /Users/hyerim/dev/pomodoro-timer
+./scripts/run_app_bundle.sh 1.0.2 2
 ```

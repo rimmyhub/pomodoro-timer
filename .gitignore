@@ -8,4 +8,5 @@ DerivedData/
 .netrc
 /.app
 /.cache
+/.tmp
 PomodoroBuddy-macOS-v*.zip
