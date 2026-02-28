@@ -6,7 +6,7 @@
 
 ```bash
 cd /Users/hyerim/dev/pomodoro-timer
-./scripts/build_app_bundle.sh 1.0.3 3
+./scripts/build_app_bundle.sh 1.0.4 4
 ```
 
 ## 2) 생성된 앱 실행
@@ -19,5 +19,5 @@ open /Users/hyerim/dev/pomodoro-timer/.app/PomodoroBuddy.app
 
 ```bash
 cd /Users/hyerim/dev/pomodoro-timer
-./scripts/run_app_bundle.sh 1.0.3 3
+./scripts/run_app_bundle.sh 1.0.4 4
 ```

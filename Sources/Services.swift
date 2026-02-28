@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ServiceManagement
 
 enum DefaultsKey {
     static let settings = "app.settings"
@@ -225,6 +226,42 @@ final class SoundService {
 
         // Final fallback so completion is never silent.
         NSSound.beep()
+    }
+}
+
+enum LaunchAtLoginServiceError: LocalizedError {
+    case unsupportedOS
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedOS:
+            return "현재 macOS 버전에서는 자동 실행 설정을 지원하지 않습니다."
+        }
+    }
+}
+
+struct LaunchAtLoginService {
+    var isEnabled: Bool {
+        guard #available(macOS 13.0, *) else { return false }
+        switch SMAppService.mainApp.status {
+        case .enabled, .requiresApproval:
+            return true
+        case .notRegistered, .notFound:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    func setEnabled(_ enabled: Bool) throws {
+        guard #available(macOS 13.0, *) else {
+            throw LaunchAtLoginServiceError.unsupportedOS
+        }
+        if enabled {
+            try SMAppService.mainApp.register()
+        } else {
+            try SMAppService.mainApp.unregister()
+        }
     }
 }
 

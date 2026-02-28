@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var draftNotificationSound: NotificationSoundOption
     @State private var draftBreakMinutes: Int
     @State private var draftBreakCycleEnabled: Bool
+    @State private var draftLaunchAtLoginEnabled: Bool
     @State private var draftWhiteNoiseEnabled: Bool
     @State private var draftWhiteNoiseTrack: WhiteNoiseTrack
     @State private var isHydratingDrafts: Bool = false
@@ -21,6 +22,7 @@ struct SettingsView: View {
         _draftNotificationSound = State(initialValue: viewModel.settings.notificationSound)
         _draftBreakMinutes = State(initialValue: viewModel.settings.breakMinutes)
         _draftBreakCycleEnabled = State(initialValue: viewModel.settings.breakCycleEnabled)
+        _draftLaunchAtLoginEnabled = State(initialValue: viewModel.launchAtLoginEnabled)
         _draftWhiteNoiseEnabled = State(initialValue: viewModel.settings.whiteNoiseEnabled)
         _draftWhiteNoiseTrack = State(initialValue: viewModel.settings.whiteNoiseTrack)
     }
@@ -35,6 +37,7 @@ struct SettingsView: View {
                     breakSection
                     soundSection
                     themeSection
+                    startupSection
                 }
                 .padding(20)
             }
@@ -62,7 +65,9 @@ struct SettingsView: View {
                         whiteNoiseEnabled: draftWhiteNoiseEnabled,
                         whiteNoiseTrack: draftWhiteNoiseTrack
                     )
-                    closeView()
+                    if viewModel.setLaunchAtLoginEnabled(draftLaunchAtLoginEnabled) {
+                        closeView()
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!viewModel.canEditSettings)
@@ -71,7 +76,23 @@ struct SettingsView: View {
         }
         .font(.body)
         .onAppear {
+            viewModel.refreshLaunchAtLoginState()
             syncDraftFromSettings()
+        }
+        .alert(
+            "자동 실행 설정 실패",
+            isPresented: Binding(
+                get: { viewModel.launchAtLoginErrorMessage != nil },
+                set: { next in
+                    if !next {
+                        viewModel.clearLaunchAtLoginError()
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) { }
+        } message: {
+            Text(viewModel.launchAtLoginErrorMessage ?? "")
         }
         .onChange(of: draftNotificationSound) { next in
             guard !isHydratingDrafts else { return }
@@ -202,6 +223,21 @@ struct SettingsView: View {
         .disabled(!viewModel.canEditSettings)
     }
 
+    private var startupSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("앱 시작")
+                .font(.headline)
+
+            Toggle("컴퓨터 켤 때 자동 실행", isOn: $draftLaunchAtLoginEnabled)
+                .toggleStyle(.switch)
+
+            Text("macOS에서 로그인 항목 승인 후 동작할 수 있습니다.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .disabled(!viewModel.canEditSettings)
+    }
+
     private func soundRow<Content: View>(title: String, @ViewBuilder control: () -> Content) -> some View {
         HStack(spacing: 12) {
             Text(title)
@@ -237,6 +273,7 @@ struct SettingsView: View {
         draftNotificationSound = current.notificationSound
         draftBreakMinutes = current.breakMinutes
         draftBreakCycleEnabled = current.breakCycleEnabled
+        draftLaunchAtLoginEnabled = viewModel.launchAtLoginEnabled
         draftWhiteNoiseEnabled = current.whiteNoiseEnabled
         draftWhiteNoiseTrack = current.whiteNoiseTrack
         viewModel.stopBGMPreview()

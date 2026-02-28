@@ -15,12 +15,15 @@ final class PomodoroViewModel: ObservableObject {
     @Published var selectedCategoryID: UUID?
     @Published var showCategoryRequiredAlert: Bool = false
     @Published private(set) var isLockedUntilReset: Bool = false
+    @Published private(set) var launchAtLoginEnabled: Bool = false
+    @Published var launchAtLoginErrorMessage: String?
 
     @Published var selectedStatsRange: StatsRange = .day
     @Published var selectedStatsCategoryID: UUID?
 
     private let persistence = PersistenceService()
     private let soundService = SoundService()
+    private let launchAtLoginService = LaunchAtLoginService()
 
     private var ticker: Timer?
     private var runSegmentStartedAt: Date?
@@ -57,6 +60,7 @@ final class PomodoroViewModel: ObservableObject {
 
         self.selectedStatsCategoryID = nil
         soundService.updateWhiteNoise(enabled: false, track: settings.whiteNoiseTrack)
+        refreshLaunchAtLoginState()
     }
 
     deinit {
@@ -236,6 +240,34 @@ final class PomodoroViewModel: ObservableObject {
 
     func stopBGMPreview() {
         soundService.stopWhiteNoisePreview()
+    }
+
+    func refreshLaunchAtLoginState() {
+        launchAtLoginEnabled = launchAtLoginService.isEnabled
+    }
+
+    @discardableResult
+    func setLaunchAtLoginEnabled(_ enabled: Bool) -> Bool {
+        guard enabled != launchAtLoginEnabled else { return true }
+
+        do {
+            try launchAtLoginService.setEnabled(enabled)
+            launchAtLoginEnabled = launchAtLoginService.isEnabled
+            launchAtLoginErrorMessage = nil
+            if enabled && !launchAtLoginEnabled {
+                launchAtLoginErrorMessage = "자동 실행을 완료하지 못했습니다. 시스템 설정 > 로그인 항목에서 PomodoroBuddy를 허용해 주세요."
+                return false
+            }
+            return true
+        } catch {
+            launchAtLoginErrorMessage = "자동 실행 설정에 실패했습니다: \(error.localizedDescription)"
+            launchAtLoginEnabled = launchAtLoginService.isEnabled
+            return false
+        }
+    }
+
+    func clearLaunchAtLoginError() {
+        launchAtLoginErrorMessage = nil
     }
 
     func applySettingsDraft(

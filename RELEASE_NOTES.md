@@ -1,6 +1,8 @@
 # PomodoroBuddy Release Notes
 
 ## 버전 목록
+- `v1.0.4` (2026-02-18): 자동 실행(로그인 항목) 설정 추가, 설정 화면 섹션 순서 정리  
+  문서: `RELEASE_NOTES_v1.0.4.md`
 - `v1.0.3` (2026-02-18): 앱 아이콘(파이차트 스타일) 교체, 번들 아이콘 연결 개선  
   문서: `RELEASE_NOTES_v1.0.3.md`
 - `v1.0.2` (2026-02-18): 설정 사운드 변경 크래시 수정, 릴리즈 스크립트 개선  
@@ -19,3 +21,5 @@
   `ee7c5260fc6a5f59e5bcba43f5361206ec3bf2be7f54f981d5cf7ef09cdb3e68`
 - `PomodoroBuddy-macOS-v1.0.3.zip`  
   `1d4a60bb4d1ca918a6a5cd421a3b02b6c34e2768a96375970d4b544bb0f2759a`
+- `PomodoroBuddy-macOS-v1.0.4.zip`  
+  `8332534daf216944a1cfa83a2109cba5fcccef41338a205ae9fae6913fb0df81`

@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="PomodoroBuddy"
-VERSION="${1:-1.0.3}"
-BUILD_NUMBER="${2:-3}"
+VERSION="${1:-1.0.4}"
+BUILD_NUMBER="${2:-4}"
 APP_PATH="$ROOT_DIR/.app/$APP_NAME.app"
 ZIP_NAME="${APP_NAME}-macOS-v${VERSION}.zip"
 ZIP_PATH="$ROOT_DIR/$ZIP_NAME"
